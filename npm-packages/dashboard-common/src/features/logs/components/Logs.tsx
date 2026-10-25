@@ -31,6 +31,10 @@ import { useGlobalLocalStorage } from "@common/lib/useGlobalLocalStorage";
 import { DeploymentInfoContext } from "@common/lib/deploymentContext";
 import { MultiSelectValue } from "@ui/MultiSelectCombobox";
 
+function appendLogs(previous: UdfLog[], entries: UdfLog[]): UdfLog[] {
+  return [...previous, ...entries].slice(-MAX_LOGS);
+}
+
 function logsQuerySignature(query: ParsedUrlQuery) {
   return JSON.stringify({
     filter: query.filter,
@@ -193,22 +197,14 @@ export function Logs({
     (entries: UdfLog[], isPaused: boolean) => {
       if (isPaused) {
         // When paused, store new logs separately (except logs for existing requests)
-        setPausedLogs((prev) => [...prev, ...entries]);
+        setPausedLogs((prev) => appendLogs(prev, entries));
         const filteredEntries = filterLogs(filters, entries) || [];
-        setPausedFilteredLogs((prev) => [...prev, ...filteredEntries]);
+        setPausedFilteredLogs((prev) => appendLogs(prev, filteredEntries));
       } else {
-        setLogs((prev) =>
-          [...prev, ...entries].slice(
-            Math.max(prev.length + entries.length - MAX_LOGS, 0),
-            prev.length + entries.length,
-          ),
-        );
+        setLogs((prev) => appendLogs(prev, entries));
         setFilteredLogs((prev) => {
           const filteredEntries = filterLogs(filters, entries) || [];
-          return [...prev, ...filteredEntries].slice(
-            Math.max(prev.length + filteredEntries.length - MAX_LOGS, 0),
-            prev.length + filteredEntries.length,
-          );
+          return appendLogs(prev, filteredEntries);
         });
       }
     },
@@ -223,20 +219,8 @@ export function Logs({
 
     // When unpausing, merge pausedLogs into logs
     if (!p && pausedLogs.length > 0) {
-      setLogs((prev) => {
-        const combined = [...prev, ...pausedLogs];
-        return combined.slice(
-          Math.max(combined.length - MAX_LOGS, 0),
-          combined.length,
-        );
-      });
-      setFilteredLogs((prev) => {
-        const combined = [...prev, ...pausedFilteredLogs];
-        return combined.slice(
-          Math.max(combined.length - MAX_LOGS, 0),
-          combined.length,
-        );
-      });
+      setLogs((prev) => appendLogs(prev, pausedLogs));
+      setFilteredLogs((prev) => appendLogs(prev, pausedFilteredLogs));
       setPausedLogs([]);
       setPausedFilteredLogs([]);
     }
